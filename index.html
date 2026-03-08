@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>坦克大战</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #000;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 800px;
+      padding: 20px;
+    }
+    
+    .title {
+      font-size: 36px;
+      font-weight: bold;
+      text-align: center;
+      margin: 30px 0;
+      color: #fff;
+    }
+    
+    .menu {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      margin: 50px 0;
+    }
+    
+    .button {
+      width: 200px;
+      height: 60px;
+      line-height: 60px;
+      text-align: center;
+      background-color: #333;
+      color: #fff;
+      border-radius: 10px;
+      font-size: 18px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    
+    .button:hover {
+      background-color: #555;
+    }
+    
+    .game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+    
+    .game-info {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 600px;
+      margin-bottom: 10px;
+      padding: 10px;
+      background-color: #333;
+      border-radius: 5px;
+    }
+    
+    .game-info-item {
+      font-size: 16px;
+    }
+    
+    canvas {
+      background-color: #222;
+      border: 1px solid #555;
+    }
+    
+    .control-buttons {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 20px;
+      gap: 10px;
+    }
+    
+    .control-row {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .control-button {
+      width: 80px;
+      height: 80px;
+      line-height: 80px;
+      text-align: center;
+      background-color: #555;
+      color: #fff;
+      border-radius: 10px;
+      font-size: 24px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    
+    .control-button:hover {
+      background-color: #777;
+    }
+    
+    .control-button:active {
+      background-color: #999;
+    }
+    
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="title">坦克大战</h1>
+    
+    <!-- 菜单界面 -->
+    <div id="menu" class="menu">
+      <div class="button" onclick="startSingleGame()">单人游戏</div>
+      <div class="button" onclick="startMultiGame()">双人游戏</div>
+      <div class="button" onclick="showLevelSelect()">选择关卡</div>
+    </div>
+    
+    <!-- 游戏界面 -->
+    <div id="game" class="game-container hidden">
+      <div class="game-info">
+        <div class="game-info-item">关卡: <span id="level">1</span></div>
+        <div class="game-info-item">分数: <span id="score">0</span></div>
+        <div class="game-info-item">生命: <span id="lives">3</span></div>
+      </div>
+      <canvas id="gameCanvas" width="600" height="400"></canvas>
+      <div class="control-buttons">
+        <div class="control-button" onmousedown="moveUp()" onmouseup="stopMove()" ontouchstart="moveUp()" ontouchend="stopMove()">↑</div>
+        <div class="control-row">
+          <div class="control-button" onmousedown="moveLeft()" onmouseup="stopMove()" ontouchstart="moveLeft()" ontouchend="stopMove()">←</div>
+          <div class="control-button" onmousedown="fire()" onmouseup="stopFire()" ontouchstart="fire()" ontouchend="stopFire()">开火</div>
+          <div class="control-button" onmousedown="moveRight()" onmouseup="stopMove()" ontouchstart="moveRight()" ontouchend="stopMove()">→</div>
+        </div>
+        <div class="control-button" onmousedown="moveDown()" onmouseup="stopMove()" ontouchstart="moveDown()" ontouchend="stopMove()">↓</div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // 游戏状态
+    let gameState = {
+      level: 1,
+      score: 0,
+      lives: 3,
+      mode: 'single',
+      canvasWidth: 600,
+      canvasHeight: 400,
+      tank: {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 40,
+        direction: 'up',
+        speed: 5
+      },
+      tank2: {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 40,
+        direction: 'up',
+        speed: 5
+      },
+      bullets: [],
+      enemies: [],
+      walls: [],
+      gameLoop: null,
+      isMoving: false,
+      moveDirection: '',
+      isFiring: false,
+      fireInterval: null
+    };
+    
+    // 初始化游戏
+    function initGame() {
+      const canvas = document.getElementById('gameCanvas');
+      gameState.canvasWidth = canvas.width;
+      gameState.canvasHeight = canvas.height;
+      
+      initTank();
+      initEnemies();
+      initWalls();
+      startGameLoop();
+    }
+    
+    // 初始化坦克
+    function initTank() {
+      const { canvasWidth, canvasHeight } = gameState;
+      gameState.tank = {
+        x: canvasWidth / 2 - 20,
+        y: canvasHeight - 80,
+        width: 40,
+        height: 40,
+        direction: 'up',
+        speed: 5
+      };
+      
+      if (gameState.mode === 'multi') {
+        gameState.tank2 = {
+          x: canvasWidth / 2 + 40,
+          y: canvasHeight - 80,
+          width: 40,
+          height: 40,
+          direction: 'up',
+          speed: 5
+        };
+      }
+    }
+    
+    // 初始化敌人
+    function initEnemies() {
+      const { level, canvasWidth } = gameState;
+      const enemies = [];
+      const enemyCount = 3 + level * 2;
+      
+      for (let i = 0; i < enemyCount; i++) {
+        enemies.push({
+          x: 50 + (i % 5) * 60,
+          y: 50 + Math.floor(i / 5) * 60,
+          width: 30,
+          height: 30,
+          direction: 'down',
+          speed: 1 + level * 0.5,
+          type: Math.random() > 0.5 ? 'normal' : 'fast'
+        });
+      }
+      
+      gameState.enemies = enemies;
+    }
+    
+    // 初始化墙
+    function initWalls() {
+      const { canvasWidth, canvasHeight } = gameState;
+      const walls = [];
+      
+      // 创建边界墙
+      for (let x = 0; x < canvasWidth; x += 20) {
+        walls.push({ x, y: 0, width: 20, height: 20 });
+        walls.push({ x, y: canvasHeight - 20, width: 20, height: 20 });
+      }
+      
+      for (let y = 0; y < canvasHeight; y += 20) {
+        walls.push({ x: 0, y, width: 20, height: 20 });
+        walls.push({ x: canvasWidth - 20, y, width: 20, height: 20 });
+      }
+      
+      // 创建中间障碍物
+      for (let i = 0; i < 10; i++) {
+        walls.push({
+          x: 100 + i * 40,
+          y: 200,
+          width: 20,
+          height: 20
+        });
+      }
+      
+      gameState.walls = walls;
+    }
+    
+    // 开始游戏循环
+    function startGameLoop() {
+      gameState.gameLoop = setInterval(() => {
+        update();
+        render();
+      }, 16);
+    }
+    
+    // 更新游戏状态
+    function update() {
+      updateTank();
+      updateBullets();
+      updateEnemies();
+      checkCollisions();
+    }
+    
+    // 更新坦克
+    function updateTank() {
+      const { tank, moveDirection, walls } = gameState;
+      if (moveDirection) {
+        let newX = tank.x;
+        let newY = tank.y;
+        
+        switch (moveDirection) {
+          case 'up':
+            newY -= tank.speed;
+            break;
+          case 'down':
+            newY += tank.speed;
+            break;
+          case 'left':
+            newX -= tank.speed;
+            break;
+          case 'right':
+            newX += tank.speed;
+            break;
+        }
+        
+        if (!checkWallCollision(newX, newY, tank.width, tank.height, walls)) {
+          gameState.tank = {
+            ...tank,
+            x: newX,
+            y: newY,
+            direction: moveDirection
+          };
+        }
+      }
+    }
+    
+    // 更新子弹
+    function updateBullets() {
+      const { bullets, enemies, walls } = gameState;
+      let newBullets = [];
+      let score = gameState.score;
+      
+      for (let bullet of bullets) {
+        let newX = bullet.x;
+        let newY = bullet.y;
+        
+        switch (bullet.direction) {
+          case 'up':
+            newY -= bullet.speed;
+            break;
+          case 'down':
+            newY += bullet.speed;
+            break;
+          case 'left':
+            newX -= bullet.speed;
+            break;
+          case 'right':
+            newX += bullet.speed;
+            break;
+        }
+        
+        // 检查是否击中敌人
+        let hitEnemy = false;
+        for (let i = 0; i < enemies.length; i++) {
+          const enemy = enemies[i];
+          if (checkCollision(newX, newY, bullet.width, bullet.height, enemy.x, enemy.y, enemy.width, enemy.height)) {
+            enemies.splice(i, 1);
+            score += 100;
+            hitEnemy = true;
+            break;
+          }
+        }
+        
+        // 检查是否击中墙
+        let hitWall = false;
+        for (let i = 0; i < walls.length; i++) {
+          const wall = walls[i];
+          if (checkCollision(newX, newY, bullet.width, bullet.height, wall.x, wall.y, wall.width, wall.height)) {
+            hitWall = true;
+            break;
+          }
+        }
+        
+        // 检查是否出界
+        if (!hitEnemy && !hitWall && newX > 0 && newX < gameState.canvasWidth && newY > 0 && newY < gameState.canvasHeight) {
+          newBullets.push({
+            ...bullet,
+            x: newX,
+            y: newY
+          });
+        }
+      }
+      
+      gameState.bullets = newBullets;
+      gameState.enemies = enemies;
+      gameState.score = score;
+      document.getElementById('score').textContent = score;
+      
+      // 检查是否通关
+      if (enemies.length === 0) {
+        nextLevel();
+      }
+    }
+    
+    // 更新敌人
+    function updateEnemies() {
+      const { enemies, walls } = gameState;
+      
+      for (let enemy of enemies) {
+        let newX = enemy.x;
+        let newY = enemy.y;
+        
+        // 随机改变方向
+        if (Math.random() < 0.01) {
+          const directions = ['up', 'down', 'left', 'right'];
+          enemy.direction = directions[Math.floor(Math.random() * directions.length)];
+        }
+        
+        switch (enemy.direction) {
+          case 'up':
+            newY -= enemy.speed;
+            break;
+          case 'down':
+            newY += enemy.speed;
+            break;
+          case 'left':
+            newX -= enemy.speed;
+            break;
+          case 'right':
+            newX += enemy.speed;
+            break;
+        }
+        
+        if (!checkWallCollision(newX, newY, enemy.width, enemy.height, walls)) {
+          enemy.x = newX;
+          enemy.y = newY;
+        } else {
+          // 碰到墙就改变方向
+          const directions = ['up', 'down', 'left', 'right'];
+          enemy.direction = directions[Math.floor(Math.random() * directions.length)];
+        }
+      }
+    }
+    
+    // 检查碰撞
+    function checkCollisions() {
+      const { tank, enemies, lives } = gameState;
+      
+      // 检查坦克是否被敌人击中
+      for (let enemy of enemies) {
+        if (checkCollision(tank.x, tank.y, tank.width, tank.height, enemy.x, enemy.y, enemy.width, enemy.height)) {
+          gameState.lives = lives - 1;
+          document.getElementById('lives').textContent = gameState.lives;
+          
+          if (gameState.lives <= 0) {
+            gameOver();
+          } else {
+            initTank();
+          }
+          break;
+        }
+      }
+    }
+    
+    // 检查碰撞辅助函数
+    function checkCollision(x1, y1, w1, h1, x2, y2, w2, h2) {
+      return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
+    }
+    
+    // 检查墙碰撞
+    function checkWallCollision(x, y, w, h, walls) {
+      for (let wall of walls) {
+        if (checkCollision(x, y, w, h, wall.x, wall.y, wall.width, wall.height)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    
+    // 渲染游戏
+    function render() {
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const { tank, tank2, bullets, enemies, walls, mode } = gameState;
+      
+      // 清空画布
+      ctx.clearRect(0, 0, gameState.canvasWidth, gameState.canvasHeight);
+      
+      // 绘制墙
+      ctx.fillStyle = '#666';
+      for (let wall of walls) {
+        ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+      }
+      
+      // 绘制坦克
+      // 坦克车身
+      ctx.fillStyle = '#0f0';
+      ctx.fillRect(tank.x + 5, tank.y + 10, 30, 20);
+      // 坦克炮塔
+      ctx.fillStyle = '#0c0';
+      ctx.beginPath();
+      ctx.arc(tank.x + 20, tank.y + 20, 10, 0, Math.PI * 2);
+      ctx.fill();
+      // 坦克炮管
+      ctx.fillStyle = '#090';
+      switch (tank.direction) {
+        case 'up':
+          ctx.fillRect(tank.x + 18, tank.y - 10, 4, 20);
+          break;
+        case 'down':
+          ctx.fillRect(tank.x + 18, tank.y + 30, 4, 20);
+          break;
+        case 'left':
+          ctx.fillRect(tank.x - 10, tank.y + 18, 20, 4);
+          break;
+        case 'right':
+          ctx.fillRect(tank.x + 30, tank.y + 18, 20, 4);
+          break;
+      }
+      
+      // 绘制第二辆坦克（双人模式）
+      if (mode === 'multi') {
+        // 坦克车身
+        ctx.fillStyle = '#00f';
+        ctx.fillRect(tank2.x + 5, tank2.y + 10, 30, 20);
+        // 坦克炮塔
+        ctx.fillStyle = '#00c';
+        ctx.beginPath();
+        ctx.arc(tank2.x + 20, tank2.y + 20, 10, 0, Math.PI * 2);
+        ctx.fill();
+        // 坦克炮管
+        ctx.fillStyle = '#009';
+        switch (tank2.direction) {
+          case 'up':
+            ctx.fillRect(tank2.x + 18, tank2.y - 10, 4, 20);
+            break;
+          case 'down':
+            ctx.fillRect(tank2.x + 18, tank2.y + 30, 4, 20);
+            break;
+          case 'left':
+            ctx.fillRect(tank2.x - 10, tank2.y + 18, 20, 4);
+            break;
+          case 'right':
+            ctx.fillRect(tank2.x + 30, tank2.y + 18, 20, 4);
+            break;
+        }
+      }
+      
+      // 绘制子弹
+      ctx.fillStyle = '#fff';
+      for (let bullet of bullets) {
+        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+      }
+      
+      // 绘制敌人
+      for (let enemy of enemies) {
+        // 敌人坦克车身
+        ctx.fillStyle = '#f00';
+        ctx.fillRect(enemy.x + 3, enemy.y + 8, 24, 14);
+        // 敌人坦克炮塔
+        ctx.fillStyle = '#c00';
+        ctx.beginPath();
+        ctx.arc(enemy.x + 15, enemy.y + 15, 7, 0, Math.PI * 2);
+        ctx.fill();
+        // 敌人坦克炮管
+        ctx.fillStyle = '#900';
+        switch (enemy.direction) {
+          case 'up':
+            ctx.fillRect(enemy.x + 13, enemy.y - 5, 4, 15);
+            break;
+          case 'down':
+            ctx.fillRect(enemy.x + 13, enemy.y + 22, 4, 15);
+            break;
+          case 'left':
+            ctx.fillRect(enemy.x - 5, enemy.y + 13, 15, 4);
+            break;
+          case 'right':
+            ctx.fillRect(enemy.x + 22, enemy.y + 13, 15, 4);
+            break;
+        }
+      }
+    }
+    
+    // 移动控制
+    function moveUp() {
+      gameState.moveDirection = 'up';
+      gameState.isMoving = true;
+    }
+    
+    function moveDown() {
+      gameState.moveDirection = 'down';
+      gameState.isMoving = true;
+    }
+    
+    function moveLeft() {
+      gameState.moveDirection = 'left';
+      gameState.isMoving = true;
+    }
+    
+    function moveRight() {
+      gameState.moveDirection = 'right';
+      gameState.isMoving = true;
+    }
+    
+    function stopMove() {
+      gameState.isMoving = false;
+      gameState.moveDirection = '';
+    }
+    
+    // 射击控制
+    function fire() {
+      if (!gameState.isFiring) {
+        gameState.isFiring = true;
+        fireBullet();
+        gameState.fireInterval = setInterval(() => {
+          fireBullet();
+        }, 500);
+      }
+    }
+    
+    function stopFire() {
+      gameState.isFiring = false;
+      if (gameState.fireInterval) {
+        clearInterval(gameState.fireInterval);
+        gameState.fireInterval = null;
+      }
+    }
+    
+    // 发射子弹
+    function fireBullet() {
+      const { tank, bullets } = gameState;
+      let bulletX, bulletY;
+      
+      switch (tank.direction) {
+        case 'up':
+          bulletX = tank.x + 15;
+          bulletY = tank.y - 10;
+          break;
+        case 'down':
+          bulletX = tank.x + 15;
+          bulletY = tank.y + 40;
+          break;
+        case 'left':
+          bulletX = tank.x - 10;
+          bulletY = tank.y + 15;
+          break;
+        case 'right':
+          bulletX = tank.x + 40;
+          bulletY = tank.y + 15;
+          break;
+      }
+      
+      const newBullet = {
+        x: bulletX,
+        y: bulletY,
+        width: 5,
+        height: 5,
+        direction: tank.direction,
+        speed: 10
+      };
+      
+      bullets.push(newBullet);
+      gameState.bullets = bullets;
+    }
+    
+    // 下一关
+    function nextLevel() {
+      const { level } = gameState;
+      if (level < 10) {
+        gameState.level = level + 1;
+        document.getElementById('level').textContent = gameState.level;
+        initTank();
+        initEnemies();
+        initWalls();
+      } else {
+        gameWin();
+      }
+    }
+    
+    // 游戏结束
+    function gameOver() {
+      clearInterval(gameState.gameLoop);
+      if (gameState.fireInterval) {
+        clearInterval(gameState.fireInterval);
+      }
+      
+      if (confirm('游戏结束！是否重新开始？')) {
+        gameState.level = 1;
+        gameState.score = 0;
+        gameState.lives = 3;
+        document.getElementById('level').textContent = gameState.level;
+        document.getElementById('score').textContent = gameState.score;
+        document.getElementById('lives').textContent = gameState.lives;
+        initTank();
+        initEnemies();
+        initWalls();
+        startGameLoop();
+      } else {
+        showMenu();
+      }
+    }
+    
+    // 游戏胜利
+    function gameWin() {
+      clearInterval(gameState.gameLoop);
+      if (gameState.fireInterval) {
+        clearInterval(gameState.fireInterval);
+      }
+      
+      if (confirm('恭喜你通关了！是否重新开始？')) {
+        gameState.level = 1;
+        gameState.score = 0;
+        gameState.lives = 3;
+        document.getElementById('level').textContent = gameState.level;
+        document.getElementById('score').textContent = gameState.score;
+        document.getElementById('lives').textContent = gameState.lives;
+        initTank();
+        initEnemies();
+        initWalls();
+        startGameLoop();
+      } else {
+        showMenu();
+      }
+    }
+    
+    // 开始单人游戏
+    function startSingleGame() {
+      gameState.mode = 'single';
+      gameState.level = 1;
+      gameState.score = 0;
+      gameState.lives = 3;
+      document.getElementById('level').textContent = gameState.level;
+      document.getElementById('score').textContent = gameState.score;
+      document.getElementById('lives').textContent = gameState.lives;
+      hideMenu();
+      initGame();
+    }
+    
+    // 开始双人游戏
+    function startMultiGame() {
+      gameState.mode = 'multi';
+      gameState.level = 1;
+      gameState.score = 0;
+      gameState.lives = 3;
+      document.getElementById('level').textContent = gameState.level;
+      document.getElementById('score').textContent = gameState.score;
+      document.getElementById('lives').textContent = gameState.lives;
+      hideMenu();
+      initGame();
+    }
+    
+    // 显示关卡选择
+    function showLevelSelect() {
+      const level = prompt('请输入关卡（1-10）：', '1');
+      const levelNum = parseInt(level);
+      if (levelNum >= 1 && levelNum <= 10) {
+        gameState.mode = 'single';
+        gameState.level = levelNum;
+        gameState.score = 0;
+        gameState.lives = 3;
+        document.getElementById('level').textContent = gameState.level;
+        document.getElementById('score').textContent = gameState.score;
+        document.getElementById('lives').textContent = gameState.lives;
+        hideMenu();
+        initGame();
+      }
+    }
+    
+    // 隐藏菜单
+    function hideMenu() {
+      document.getElementById('menu').classList.add('hidden');
+      document.getElementById('game').classList.remove('hidden');
+    }
+    
+    // 显示菜单
+    function showMenu() {
+      document.getElementById('game').classList.add('hidden');
+      document.getElementById('menu').classList.remove('hidden');
+      if (gameState.gameLoop) {
+        clearInterval(gameState.gameLoop);
+      }
+      if (gameState.fireInterval) {
+        clearInterval(gameState.fireInterval);
+      }
+    }
+  </script>
+</body>
+</html>

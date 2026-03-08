@@ -1,0 +1,6 @@
+<view class="container">
+  <view class="title">坦克大战</view>
+  <view class="button" bindtap="startSingleGame">单人游戏</view>
+  <view class="button" bindtap="startMultiGame">双人游戏</view>
+  <view class="button" bindtap="showLevelSelect">选择关卡</view>
+</view>

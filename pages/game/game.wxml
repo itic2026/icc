@@ -1,0 +1,17 @@
+<view class="game-container">
+  <view class="game-info">
+    <view class="level">关卡: {{level}}</view>
+    <view class="score">分数: {{score}}</view>
+    <view class="lives">生命: {{lives}}</view>
+  </view>
+  <canvas canvas-id="gameCanvas" class="game-canvas" bindtouchstart="onTouchStart" bindtouchmove="onTouchMove" bindtouchend="onTouchEnd"></canvas>
+  <view class="control-buttons">
+    <view class="control-button" bindtouchstart="moveUp" bindtouchend="stopMove">↑</view>
+    <view class="control-row">
+      <view class="control-button" bindtouchstart="moveLeft" bindtouchend="stopMove">←</view>
+      <view class="control-button" bindtouchstart="fire" bindtouchend="stopFire">开火</view>
+      <view class="control-button" bindtouchstart="moveRight" bindtouchend="stopMove">→</view>
+    </view>
+    <view class="control-button" bindtouchstart="moveDown" bindtouchend="stopMove">↓</view>
+  </view>
+</view>
